@@ -1,0 +1,36 @@
+{
+  "translation": {
+    "welcome": "Welcome",
+    "home": "Home",
+    "all_posts": "All Posts",
+    "all_articles": "All Articles",
+    "create_post": "Create Post",
+    "create_article": "Create Article",
+    "profile": "Profile",
+    "logout": "Logout",
+    "login": "Login",
+    "register": "Register",
+    "language": "Language",
+    "farsi": "Farsi",
+    "english": "English",
+    "trending": "Trending Posts",
+    "title": "Title",
+    "content": "Content",
+    "imageUrl": "Image URL (Optional)",
+    "uploadImage": "Upload Image",
+    "submit": "Submit",
+    "post": "Post",
+    "article": "Article",
+    "username": "Username",
+    "password": "Password",
+    "error": {
+      "required": "This field is required.",
+      "minLength": "Minimum {{count}} characters are required.",
+      "invalidUrl": "Invalid image URL.",
+      "invalidCredentials": "Invalid username or password.",
+      "duplicateUsername": "This username is already taken."
+    },
+    "login_success": "Login successful!",
+    "register_success": "Registration successful!"
+  }
+}

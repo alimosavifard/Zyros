@@ -1,0 +1,56 @@
+{
+  "name": "frontend",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build && npm run copy:locales",
+    "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
+    "preview": "vite preview",
+    "copy:locales": "cp -r src/locales public/assets/"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.87.1",
+    "axios": "^1.11.0",
+    "date-fns": "^2.30.0",
+    "formik": "^2.4.6",
+    "i18next": "^25.5.2",
+    "i18next-browser-languagedetector": "^8.2.0",
+    "i18next-http-backend": "^3.0.2",
+    "js-cookie": "^3.0.5",
+    "jwt-decode": "^4.0.0",
+    "lodash": "^4.17.21",
+    "prop-types": "^15.8.1",
+    "quill": "^2.0.3",
+    "react": "^18.1.1",
+    "react-dom": "^18.1.1",
+    "react-i18next": "^15.7.3",
+    "react-quill": "^2.0.0",
+    "react-router-dom": "^6.30.1",
+    "react-toastify": "^11.0.5",
+    "react-window": "^2.0.2",
+    "yup": "^1.7.0"
+  },
+  "overrides": {
+    "react-quill": {
+      "quill": "^2.0.3"
+    }
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.33.0",
+    "@types/react": "^18.3.24",
+    "@types/react-dom": "^18.1.7",
+    "@vitejs/plugin-react": "^5.0.0",
+    "autoprefixer": "^10.4.21",
+    "eslint": "^9.33.0",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "eslint-plugin-react-refresh": "^0.4.20",
+    "globals": "^16.3.0",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^3.4.17",
+    "typescript": "~5.8.3",
+    "typescript-eslint": "^8.39.1",
+    "vite": "^7.1.2"
+  }
+}

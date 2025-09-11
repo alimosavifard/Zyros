@@ -1,0 +1,36 @@
+{
+  "translation": {
+    "welcome": "به صفحه اصلی خوش آمدید",
+    "home": "صفحه اصلی",
+    "all_posts": "همه پست‌ها",
+    "all_articles": "همه مقالات",
+    "create_post": "پست جدید",
+    "create_article": "مقاله جدید",
+    "profile": "پروفایل",
+    "logout": "خروج",
+    "login": "ورود",
+    "register": "ثبت‌نام",
+    "language": "زبان",
+    "farsi": "فارسی",
+    "english": "انگلیسی",
+    "trending": "پست‌های پرطرفدار",
+    "title": "عنوان",
+    "content": "محتوا",
+    "imageUrl": "آدرس تصویر (اختیاری)",
+    "uploadImage": "آپلود تصویر",
+    "submit": "ارسال",
+    "post": "پست",
+    "article": "مقاله",
+    "username": "نام کاربری",
+    "password": "رمز عبور",
+    "error": {
+      "required": "این فیلد الزامی است.",
+      "minLength": "حداقل {{count}} کاراکتر الزامی است.",
+      "invalidUrl": "آدرس تصویر معتبر نیست.",
+      "invalidCredentials": "نام کاربری یا رمز عبور اشتباه است.",
+      "duplicateUsername": "این نام کاربری قبلاً ثبت شده است."
+    },
+    "login_success": "ورود موفقیت‌آمیز بود!",
+    "register_success": "ثبت‌نام موفقیت‌آمیز بود!"
+  }
+}
