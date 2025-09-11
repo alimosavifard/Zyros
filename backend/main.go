@@ -41,12 +41,13 @@ func main() {
 	userRepo := repositories.NewUserRepository(db)
 	roleRepo := repositories.NewRoleRepository(db)
 	postRepo := repositories.NewPostRepository(db)
-	likeRepo := repositories.NewLikeRepository(db) 
+	likeRepo := repositories.NewLikeRepository(db)
 
-	// Pass the Config struct to services that need it
-	authService := services.NewAuthService(userRepo, roleRepo, redisClient, cfg)
-	postService := services.NewPostService(postRepo, redisClient, likeService)
+	// اصلاح ترتیب: likeService را اول تعریف کنید
 	likeService := services.NewLikeService(likeRepo)
+	authService := services.NewAuthService(userRepo, roleRepo, redisClient, cfg)
+	postService := services.NewPostService(postRepo, redisClient, likeService) // حالا likeService تعریف شده
+	
 	
 	// Initialize controllers
 	authController := controllers.NewAuthController(authService)
@@ -58,25 +59,24 @@ func main() {
 	r.Use(middleware.CORSMiddleware(cfg.ALLOWED_ORIGINS))
 	r.Use(gin.Logger())
 	r.Use(middleware.RateLimitMiddleware(redisClient, cfg.RATE_LIMIT))
+	r.Use(gin.Recovery()) // جدید: برای مدیریت panic و جلوگیری از کرش سرور
 
 	// CSRF middleware is now initialized with a secret
 	r.GET("/api/v1/health", controllers.HealthCheck)
 	r.POST("/api/v1/register", authController.Register)
 	r.POST("/api/v1/login", authController.Login)
 	r.GET("/api/v1/csrf-token", authController.GetCSRFToken)
-	r.GET("/api/v1/posts", postController.GetPosts)          // عمومی برای مهمانان
-    r.GET("/api/v1/posts/:id", postController.GetPostByID)   // عمومی برای مهمانان
+	r.GET("/api/v1/posts", postController.GetPosts)
+	r.GET("/api/v1/posts/:id", postController.GetPostByID)
 
-	api := r.Group("/api/v1")	
-	// Use CSRF and Auth middlewares on a group of routes
+	api := r.Group("/api/v1")
 	api.Use(middleware.CSRFMiddleware(cfg.CSRF_SECRET), middleware.AuthMiddleware(authService))
 	{
 		api.POST("/posts", middleware.PermissionMiddleware(authService, "create_post"), postController.CreatePost)
 		api.POST("/articles", middleware.PermissionMiddleware(authService, "create_article"), articleController.CreateArticle)
 		api.POST("/upload-image", middleware.PermissionMiddleware(authService, "upload_image"), postController.UploadImage)
-        api.POST("/posts/:id/like", middleware.PermissionMiddleware(authService, "like_post"), likeController.LikePost)
-        api.DELETE("/posts/:id/like", middleware.PermissionMiddleware(authService, "unlike_post"), likeController.UnlikePost)
-
+		api.POST("/posts/:id/like", middleware.PermissionMiddleware(authService, "like_post"), likeController.LikePost)
+		api.DELETE("/posts/:id/like", middleware.PermissionMiddleware(authService, "unlike_post"), likeController.UnlikePost)
 	}
 
 	r.Static("/uploads", "./uploads")

@@ -9,6 +9,7 @@ import (
 	"github.com/alimosavifard/zyros-backend/repositories"
 	"github.com/microcosm-cc/bluemonday"
 	"github.com/redis/go-redis/v9"
+	"github.com/alimosavifard/zyros-backend/utils"
 	"time"
 )
 
@@ -78,10 +79,12 @@ func (s *PostService) GetPosts(ctx context.Context, lang string, postType string
 		}
 	}
 
-	posts, err := s.repo.GetByLang(ctx, lang, postType, page, limit)
-	if err != nil {
-		return nil, err
-	}
+    posts, err := s.repo.GetByLang(ctx, lang, postType, page, limit)
+    if err != nil {
+        utils.InitLogger().Error().Err(err).Msg("Failed to fetch posts from DB")
+        return nil, fmt.Errorf("failed to fetch posts from DB: %w", err)
+    }
+	
 
 	postResponses := make([]PostResponse, len(posts))
 	for i, post := range posts {

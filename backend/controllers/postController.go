@@ -59,31 +59,16 @@ func (c *PostController) CreatePost(ctx *gin.Context) {
 }
 
 func (c *PostController) GetPosts(ctx *gin.Context) {
-	lang := ctx.DefaultQuery("lang", "en")
-	postType := ctx.DefaultQuery("type", "post")
-	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
-	limit, _ := strconv.Atoi(ctx.DefaultQuery("limit", "10"))
-
-	if page < 1 {
-		page = 1
-	}
-	if limit < 1 {
-		limit = 10
-	}
-
-	userIDInterface, _ := ctx.Get("userID")
-	var userID uint
-	if userIDInterface != nil {
-		userID = userIDInterface.(uint)
-	} // برای مهمانان 0
-
-	postResponses, err := c.postService.GetPosts(ctx, lang, postType, page, limit, userID)
-	if err != nil {
-		utils.SendError(ctx, http.StatusInternalServerError, "Failed to retrieve posts", err)
-		return
-	}
-
-	utils.SendSuccess(ctx, "Posts retrieved successfully", gin.H{"posts": postResponses}, nil)
+	 log.Println("Handling /api/v1/posts request...")
+    // ...
+    postResponses, err := c.postService.GetPosts(ctx, lang, postType, page, limit, userID)
+    if err != nil {
+        utils.InitLogger().Error().Err(err).Msg("Failed to retrieve posts") // log خطا
+        utils.SendError(ctx, http.StatusInternalServerError, "Failed to retrieve posts", err)
+        return
+    }
+    utils.InitLogger().Info().Msgf("Retrieved %d posts", len(postResponses)) // log موفقیت
+    utils.SendSuccess(ctx, "Posts retrieved successfully", gin.H{"posts": postResponses}, nil)
 }
 
 func (c *PostController) GetPostByID(ctx *gin.Context) {

@@ -6,8 +6,14 @@ import (
 	"gorm.io/gorm"
 )
 
+
 type PostRepository struct {
 	db *gorm.DB
+}
+
+// GetDB یک متد عمومی برای دسترسی به اتصال دیتابیس
+func (r *PostRepository) GetDB() *gorm.DB {
+	return r.db
 }
 
 func NewPostRepository(db *gorm.DB) *PostRepository {

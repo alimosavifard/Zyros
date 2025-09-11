@@ -1,8 +1,6 @@
 package requests
 
 import (
-	"github.com/go-playground/validator/v10"
-	"errors"
 )
 
 type Validatable interface {

@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"time"
-
+	"strconv"
+	"net/http"
+	
 	"github.com/alimosavifard/zyros-backend/config"
 	"github.com/alimosavifard/zyros-backend/models"
 	"github.com/alimosavifard/zyros-backend/repositories"
@@ -68,11 +70,13 @@ func (s *AuthService) Login(ctx context.Context, username, password string) (str
 	
 	user, err := s.userRepo.FindByUsername(ctx, username)
 	if err != nil {
-		return "", utils.ErrInvalidCredentials
+		utils.SendError(ctx, http.StatusInternalServerError, "invalid credentials", err)
+		return ""        
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password)); err != nil {
-		return "", utils.ErrInvalidCredentials
+		utils.SendError(ctx, http.StatusInternalServerError, "invalid credentials", err)
+		return ""
 	}
 
 	return s.generateToken(user.ID, user.Username)

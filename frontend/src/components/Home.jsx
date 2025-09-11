@@ -9,7 +9,6 @@ import LoadingSpinner from './ui/LoadingSpinner';
 
 const Home = () => {
   const { t, i18n } = useTranslation();
-  // `user` در اینجا برای بررسی وضعیت ورود استفاده می‌شود، اما ریدایرکتی صورت نمی‌گیرد.
   const { user } = useAuth(); 
 
   const [currentLang, setCurrentLang] = React.useState(i18n.language);
@@ -25,8 +24,9 @@ const Home = () => {
     queryFn: () => getPosts({ lang: currentLang, type: postType }),
   });
 
-  // اطمینان حاصل می‌کنیم که data.data.posts همیشه یک آرایه است.
-  const postsData = data?.data?.posts || [];
+  // عبارت زیر را به postsData = data?.posts || [] تغییر دهید.
+  // این تغییر، مستقیماً به آرایه پست‌ها دسترسی پیدا می‌کند.
+  const postsData = data?.posts || [];
 
   const handleLangChange = (lang) => {
     i18n.changeLanguage(lang);
@@ -46,8 +46,10 @@ const Home = () => {
     return (
       <div className="min-h-screen">
         <Navbar />
-        <div className="container mx-auto mt-10 p-4 text-center">
-          <h2 className="text-2xl font-bold text-red-600">{t('error.fetchPosts')}</h2>
+        <div className="container mx-auto mt-10 text-center">
+          <h2 className="text-2xl font-bold text-red-600">
+            {t('error.fetchPosts')}
+          </h2>
           <p className="mt-2 text-gray-600">{error.message}</p>
         </div>
       </div>
@@ -55,14 +57,12 @@ const Home = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white">
       <Navbar />
-      <div className="container mx-auto p-4 md:p-8">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-4 md:mb-0">
-            {t('recent_posts')}
-          </h1>
-          <div className="flex items-center space-x-4">
+      <div className="container mx-auto p-4 mt-8">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-3xl font-bold">{t('latest_posts')}</h1>
+          <div className="flex space-x-4">
             <select
               value={currentLang}
               onChange={(e) => handleLangChange(e.target.value)}
@@ -91,9 +91,8 @@ const Home = () => {
         ) : (
           <div className="flex flex-col items-center justify-center p-10 text-center">
             <h2 className="text-xl font-semibold text-gray-500 dark:text-gray-400">
-              {t('noPostsFound')}
+              {t('no_posts_found')}
             </h2>
-            <p className="mt-2 text-gray-400 dark:text-gray-500">{t('tryCreatingOne')}</p>
           </div>
         )}
       </div>
