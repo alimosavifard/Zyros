@@ -2,109 +2,116 @@ package controllers
 
 import (
 	"context"
-    "fmt"
-    "github.com/alimosavifard/zyros-backend/models"
-    "github.com/alimosavifard/zyros-backend/requests"
-    "github.com/alimosavifard/zyros-backend/services"
-    "github.com/alimosavifard/zyros-backend/utils"
-    "github.com/gin-gonic/gin"
-    "net/http"
-    "os"
-    "path/filepath"
-    "strconv"
-    "time"
+	"fmt"
+	"github.com/alimosavifard/zyros-backend/models"
+	"github.com/alimosavifard/zyros-backend/requests"
+	"github.com/alimosavifard/zyros-backend/services"
+	"github.com/alimosavifard/zyros-backend/utils"
+	"github.com/gin-gonic/gin"
+	"net/http"
+	"os"
+	"path/filepath"
+	"strconv"
+	"time"
 )
 
 type PostController struct {
-    postService *services.PostService
+	postService *services.PostService
 }
 
 func NewPostController(postService *services.PostService) *PostController {
-    return &PostController{postService: postService}
+	return &PostController{postService: postService}
 }
 
 func (c *PostController) CreatePost(ctx *gin.Context) {
-    var req requests.PostRequest
-    if err := ctx.ShouldBindJSON(&req); err != nil {
-        utils.SendError(ctx, http.StatusBadRequest, "Invalid input", err)
-        return
-    }
-    
-    if err := requests.ValidateStruct(&req); err != nil {
-        utils.SendError(ctx, http.StatusBadRequest, "Validation failed", err)
-        return
-    }
+	var req requests.PostRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		utils.SendError(ctx, http.StatusBadRequest, "Invalid input", err)
+		return
+	}
 
-    userID, exists := ctx.Get("userID")
-    if !exists {
-        utils.SendError(ctx, http.StatusUnauthorized, "Unauthorized", nil)
-        return
-    }
+	if err := requests.ValidateStruct(&req); err != nil {
+		utils.SendError(ctx, http.StatusBadRequest, "Validation failed", err)
+		return
+	}
 
-    post := &models.Post{
-        Title:    req.Title,
-        Content:  req.Content,
-        Type:     req.Type,
-        Lang:     req.Lang,
-        UserID:   userID.(uint),
-        ImageUrl: req.ImageUrl,
-    }
+	userID, exists := ctx.Get("userID")
+	if !exists {
+		utils.SendError(ctx, http.StatusUnauthorized, "Unauthorized", nil)
+		return
+	}
 
-    if err := c.postService.CreatePost(ctx, post); err != nil {
-        utils.SendError(ctx, http.StatusInternalServerError, "Failed to create post", err)
-        return
-    }
+	post := &models.Post{
+		Title:    req.Title,
+		Content:  req.Content,
+		Type:     req.Type,
+		Lang:     req.Lang,
+		UserID:   userID.(uint),
+		ImageUrl: req.ImageUrl,
+	}
 
-    utils.SendSuccess(ctx, "Post created successfully", post, nil)
+	if err := c.postService.CreatePost(ctx, post); err != nil {
+		utils.SendError(ctx, http.StatusInternalServerError, "Failed to create post", err)
+		return
+	}
+
+	utils.SendSuccess(ctx, "Post created successfully", post, nil)
 }
-
 
 func (c *PostController) GetPosts(ctx *gin.Context) {
-    lang := ctx.DefaultQuery("lang", "en")
-    postType := ctx.DefaultQuery("type", "post")
-    page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
-    limit, _ := strconv.Atoi(ctx.DefaultQuery("limit", "10"))
+	lang := ctx.DefaultQuery("lang", "en")
+	postType := ctx.DefaultQuery("type", "post")
+	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(ctx.DefaultQuery("limit", "10"))
 
-    if page < 1 {
-        page = 1
-    }
-    if limit < 1 {
-        limit = 10
-    }
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 {
+		limit = 10
+	}
 
-    posts, err := c.postService.GetPosts(lang, postType, page, limit)
-    if err != nil {
-        utils.SendError(ctx, http.StatusInternalServerError, "Failed to retrieve posts", err)
-        return
-    }
+	userIDInterface, _ := ctx.Get("userID")
+	var userID uint
+	if userIDInterface != nil {
+		userID = userIDInterface.(uint)
+	} // برای مهمانان 0
 
-    // This is the important part, it sends a response with the "posts" key inside "data"
-    utils.SendSuccess(ctx, "Posts retrieved successfully", gin.H{"posts": posts}, nil)
+	postResponses, err := c.postService.GetPosts(ctx, lang, postType, page, limit, userID)
+	if err != nil {
+		utils.SendError(ctx, http.StatusInternalServerError, "Failed to retrieve posts", err)
+		return
+	}
+
+	utils.SendSuccess(ctx, "Posts retrieved successfully", gin.H{"posts": postResponses}, nil)
 }
 
-
-// متد جدید برای دریافت یک پست با شناسه
 func (c *PostController) GetPostByID(ctx *gin.Context) {
-    idStr := ctx.Param("id")
-    id, err := strconv.ParseUint(idStr, 10, 32)
-    if err != nil {
-        utils.SendError(ctx, http.StatusBadRequest, "Invalid post ID", err)
-        return
-    }
+	idStr := ctx.Param("id")
+	id, err := strconv.ParseUint(idStr, 10, 32)
+	if err != nil {
+		utils.SendError(ctx, http.StatusBadRequest, "Invalid post ID", err)
+		return
+	}
 
-    post, err := c.postService.GetPostByID(uint(id))
-    if err != nil {
-        if err.Error() == "record not found" {
-            utils.SendError(ctx, http.StatusNotFound, "Post not found", err)
-        } else {
-            utils.SendError(ctx, http.StatusInternalServerError, "Failed to get post", err)
-        }
-        return
-    }
+	userIDInterface, _ := ctx.Get("userID")
+	var userID uint
+	if userIDInterface != nil {
+		userID = userIDInterface.(uint)
+	}
 
-    utils.SendSuccess(ctx, "Post retrieved successfully", post, nil)
+	postResp, err := c.postService.GetPostByID(ctx, uint(id), userID)
+	if err != nil {
+		if err.Error() == "record not found" {
+			utils.SendError(ctx, http.StatusNotFound, "Post not found", err)
+		} else {
+			utils.SendError(ctx, http.StatusInternalServerError, "Failed to get post", err)
+		}
+		return
+	}
+
+	utils.SendSuccess(ctx, "Post retrieved successfully", postResp, nil)
 }
-
 
 
 func (c *PostController) UploadImage(ctx *gin.Context) {

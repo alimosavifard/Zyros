@@ -3,14 +3,29 @@ package services
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"time"
-
 	"github.com/alimosavifard/zyros-backend/models"
 	"github.com/alimosavifard/zyros-backend/repositories"
-	"github.com/redis/go-redis/v9"
 	"github.com/microcosm-cc/bluemonday"
+	"github.com/redis/go-redis/v9"
+	"time"
 )
+
+// PostResponse: struct واسط برای پاسخ، بدون تغییر مدل Post
+type PostResponse struct {
+	ID            uint   `json:"id"`
+	Title         string `json:"title"`
+	Content       string `json:"content"`
+	Type          string `json:"type"`
+	Lang          string `json:"lang"`
+	ImageUrl      string `json:"imageUrl,omitempty"`
+	UserID        uint   `json:"user_id"`
+	User          models.User `json:"user,omitempty"`
+	CreatedAt     time.Time `json:"created_at,omitempty"` // اگر نیاز باشد
+	LikesCount    int64  `json:"likesCount"`
+	IsLikedByUser bool   `json:"isLikedByUser"`
+}
 
 type PostService struct {
 	repo        *repositories.PostRepository
@@ -19,116 +34,124 @@ type PostService struct {
 }
 
 func NewPostService(repo *repositories.PostRepository, redisClient *redis.Client, likeService *LikeService) *PostService {
-    return &PostService{repo: repo, redisClient: redisClient, likeService: likeService}
+	return &PostService{repo: repo, redisClient: redisClient, likeService: likeService}
 }
 
-func (s *PostService) CreatePost(post *models.Post) error {
+func (s *PostService) CreatePost(ctx context.Context, post *models.Post) error {
+	p := bluemonday.UGCPolicy()
+	post.Content = p.Sanitize(post.Content)
 
-	p := bluemonday.UGCPolicy()  // سیاست امن برای UGC
-    post.Content = p.Sanitize(post.Content)  // sanitize قبل از ذخیره
-	
-	// شروع یک ترنزاکشن جدید
-	tx := s.repo.DB.Begin()
+	tx := s.repo.db.Begin()
 	if tx.Error != nil {
 		return tx.Error
 	}
 
-	// ذخیره پست در دیتابیس در داخل ترنزاکشن
 	if err := s.repo.CreateWithTx(tx, post); err != nil {
 		tx.Rollback()
 		return err
 	}
 
-	// ایجاد الگوی کلید کش برای حذف تمام صفحات مرتبط
 	cacheKeyPattern := fmt.Sprintf("posts:lang:%s:type:%s:*", post.Lang, post.Type)
-	keys, err := s.redisClient.Keys(context.Background(), cacheKeyPattern).Result()
+	keys, err := s.redisClient.Keys(ctx, cacheKeyPattern).Result()
 	if err != nil {
-		// اگر خطا در دریافت کلیدها رخ داد، ترنزاکشن را Rollback کن
 		tx.Rollback()
 		return err
 	}
 	if len(keys) > 0 {
-		if err := s.redisClient.Del(context.Background(), keys...).Err(); err != nil {
+		if err := s.redisClient.Del(ctx, keys...).Err(); err != nil {
 			tx.Rollback()
 			return err
 		}
 	}
 
-	// Commit ترنزاکشن در صورت موفقیت تمام عملیات‌ها
 	return tx.Commit().Error
-	
 }
 
-func (s *PostService) GetPosts(lang string, postType string, page, limit int) ([]models.Post, error) {
-	// Generate a unique cache key for the specific query
-	cacheKey := fmt.Sprintf("posts:lang:%s:type:%s:page:%d:limit:%d", lang, type, page, limit)
-	
-	// Try to get posts from cache
-	cachedPosts, err := s.redisClient.Get(context.Background(), cacheKey).Result()
+func (s *PostService) GetPosts(ctx context.Context, lang string, postType string, page, limit int, userID uint) ([]PostResponse, error) {
+	cacheKey := fmt.Sprintf("posts:lang:%s:type:%s:page:%d:limit:%d:user:%d", lang, postType, page, limit, userID)
+
+	cachedPosts, err := s.redisClient.Get(ctx, cacheKey).Result()
 	if err == nil && cachedPosts != "" {
-		var posts []models.Post
-		err = json.Unmarshal([]byte(cachedPosts), &posts)
-		if err == nil {
-			return posts, nil
+		var postResponses []PostResponse
+		if json.Unmarshal([]byte(cachedPosts), &postResponses) == nil {
+			return postResponses, nil
 		}
 	}
 
-	// If cache miss, fetch from database
-	posts, err := s.repo.GetByLang(context.Background(), lang, postType, page, limit)  // تغییر به context.Background() اگر ctx نداره
-    if err != nil {
-        return nil, err
-    }
-
-	// اضافه کردن لایک‌ها به هر پست (فرض بر این که userID از context یا request می‌آد، اینجا 0 فرض کردیم برای مثال – در handler واقعی جایگزین کن)
-    userID := uint(0)  // جایگزین با userID واقعی از JWT
-    for i := range posts {
-        likesCount, _ := s.likeService.GetPostLikes(posts[i].ID)
-        isLiked, _ := s.likeService.likeRepo.IsLiked(userID, posts[i].ID)
-        posts[i].LikesCount = likesCount  // فرض بر این که مدل Post فیلد LikesCount و IsLikedByUser داره (اگر نه، یه struct response جدید بساز)
-        posts[i].IsLikedByUser = isLiked
-    }
-
-	
-	// Serialize posts to JSON and cache them
-	serializedPosts, err := json.Marshal(posts)
-	if err == nil {
-		s.redisClient.Set(context.Background(), cacheKey, serializedPosts, 5*time.Minute) // Cache for 5 minutes
+	posts, err := s.repo.GetByLang(ctx, lang, postType, page, limit)
+	if err != nil {
+		return nil, err
 	}
 
-	return posts, nil
+	postResponses := make([]PostResponse, len(posts))
+	for i, post := range posts {
+		likesCount, err := s.likeService.GetPostLikes(ctx, post.ID)
+		if err != nil {
+			likesCount = 0 // fallback
+		}
+		isLiked, err := s.likeService.likeRepo.IsLiked(ctx, userID, post.ID)
+		if err != nil {
+			isLiked = false
+		}
+
+		postResponses[i] = PostResponse{
+			ID:            post.ID,
+			Title:         post.Title,
+			Content:       post.Content,
+			Type:          post.Type,
+			Lang:          post.Lang,
+			ImageUrl:      post.ImageUrl,
+			UserID:        post.UserID,
+			User:          post.User,
+			LikesCount:    likesCount,
+			IsLikedByUser: isLiked,
+		}
+	}
+
+	serialized, err := json.Marshal(postResponses)
+	if err == nil {
+		s.redisClient.Set(ctx, cacheKey, serialized, 5*time.Minute)
+	}
+
+	return postResponses, nil
 }
 
+func (s *PostService) GetPostByID(ctx context.Context, id uint, userID uint) (*PostResponse, error) {
+	cacheKey := fmt.Sprintf("post:%d:user:%d", id, userID)
 
-// تابع جدید برای دریافت یک پست با شناسه
-func (s *PostService) GetPostByID(id uint) (*models.Post, error) {
-    // ابتدا از کش بررسی می‌کنیم
-    cacheKey := fmt.Sprintf("post:%d", id)
-    cachedPost, err := s.redisClient.Get(context.Background(), cacheKey).Result()
-    if err == nil && cachedPost != "" {
-        var post models.Post
-        err = json.Unmarshal([]byte(cachedPost), &post)
-        if err == nil {
-            return &post, nil
-        }
-    }
+	cachedPost, err := s.redisClient.Get(ctx, cacheKey).Result()
+	if err == nil && cachedPost != "" {
+		var postResp PostResponse
+		if json.Unmarshal([]byte(cachedPost), &postResp) == nil {
+			return &postResp, nil
+		}
+	}
 
-    // اگر در کش نبود، از دیتابیس می‌خوانیم
-	post, err := s.repo.FindByID(id)
-    if err != nil {
-        return nil, err
-    }
-	// اضافه کردن لایک‌ها
-    userID := uint(0)  // جایگزین با userID واقعی
-    likesCount, _ := s.likeService.GetPostLikes(post.ID)
-    isLiked, _ := s.likeService.likeRepo.IsLiked(userID, post.ID)
-    post.LikesCount = likesCount
-    post.IsLikedByUser = isLiked	
-	
-    // نتیجه را در کش ذخیره می‌کنیم
-    postJSON, err := json.Marshal(post)
-    if err == nil {
-        s.redisClient.Set(context.Background(), cacheKey, postJSON, 1*time.Hour) // کش برای ۱ ساعت
-    }
+	post, err := s.repo.FindByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
 
-    return post, nil
+	likesCount, _ := s.likeService.GetPostLikes(ctx, post.ID)
+	isLiked, _ := s.likeService.likeRepo.IsLiked(ctx, userID, post.ID)
+
+	postResp := &PostResponse{
+		ID:            post.ID,
+		Title:         post.Title,
+		Content:       post.Content,
+		Type:          post.Type,
+		Lang:          post.Lang,
+		ImageUrl:      post.ImageUrl,
+		UserID:        post.UserID,
+		User:          post.User,
+		LikesCount:    likesCount,
+		IsLikedByUser: isLiked,
+	}
+
+	postJSON, err := json.Marshal(postResp)
+	if err == nil {
+		s.redisClient.Set(ctx, cacheKey, postJSON, 1*time.Hour)
+	}
+
+	return postResp, nil
 }

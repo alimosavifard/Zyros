@@ -31,7 +31,8 @@ func main() {
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.Default()
 	r.SetTrustedProxies([]string{"127.0.0.1"})
-
+	
+	
 	// Connect to DB and Redis using the config
 	db := config.ConnectDB(cfg)
 	redisClient := config.ConnectRedis(cfg)
@@ -44,9 +45,9 @@ func main() {
 
 	// Pass the Config struct to services that need it
 	authService := services.NewAuthService(userRepo, roleRepo, redisClient, cfg)
-	postService := services.NewPostService(postRepo, redisClient)
+	postService := services.NewPostService(postRepo, redisClient, likeService)
 	likeService := services.NewLikeService(likeRepo)
-
+	
 	// Initialize controllers
 	authController := controllers.NewAuthController(authService)
 	postController := controllers.NewPostController(postService)
@@ -63,14 +64,14 @@ func main() {
 	r.POST("/api/v1/register", authController.Register)
 	r.POST("/api/v1/login", authController.Login)
 	r.GET("/api/v1/csrf-token", authController.GetCSRFToken)
+	r.GET("/api/v1/posts", postController.GetPosts)          // عمومی برای مهمانان
+    r.GET("/api/v1/posts/:id", postController.GetPostByID)   // عمومی برای مهمانان
 
-	api := r.Group("/api/v1")
+	api := r.Group("/api/v1")	
 	// Use CSRF and Auth middlewares on a group of routes
 	api.Use(middleware.CSRFMiddleware(cfg.CSRF_SECRET), middleware.AuthMiddleware(authService))
 	{
 		api.POST("/posts", middleware.PermissionMiddleware(authService, "create_post"), postController.CreatePost)
-		api.GET("/posts", postController.GetPosts)
-		api.GET("/posts/:id", postController.GetPostByID) // مسیر جدید
 		api.POST("/articles", middleware.PermissionMiddleware(authService, "create_article"), articleController.CreateArticle)
 		api.POST("/upload-image", middleware.PermissionMiddleware(authService, "upload_image"), postController.UploadImage)
         api.POST("/posts/:id/like", middleware.PermissionMiddleware(authService, "like_post"), likeController.LikePost)

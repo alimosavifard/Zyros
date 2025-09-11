@@ -2,8 +2,8 @@ package repositories
 
 import (
 	"context"
-	"gorm.io/gorm"
 	"github.com/alimosavifard/zyros-backend/models"
+	"gorm.io/gorm"
 )
 
 type PostRepository struct {
@@ -22,22 +22,20 @@ func (r *PostRepository) CreateWithTx(tx *gorm.DB, post *models.Post) error {
 	return tx.Create(post).Error
 }
 
-
 func (r *PostRepository) GetByLang(ctx context.Context, lang string, postType string, page, limit int) ([]models.Post, error) {
-    var posts []models.Post
-    offset := (page - 1) * limit
-    err := r.db.WithContext(ctx).Where("lang = ? AND type = ? AND deleted_at IS NULL", lang, postType).
-        Preload("User"). // اضافه کردن Preload برای User
-        Offset(offset).Limit(limit).Find(&posts).Error
-    return posts, err
+	var posts []models.Post
+	offset := (page - 1) * limit
+	err := r.db.WithContext(ctx).
+		Where("lang = ? AND type = ? AND deleted_at IS NULL", lang, postType).
+		Preload("User"). // Preload User برای نمایش username در frontend
+		Offset(offset).Limit(limit).Find(&posts).Error
+	return posts, err
 }
 
-// تابع جدید برای پیدا کردن پست با شناسه
-func (r *PostRepository) FindByID(id uint) (*models.Post, error) {
-    var post models.Post
-    err := r.db.First(&post, id).Error
-    if err != nil {
-        return nil, err
-    }
-    return &post, nil
+func (r *PostRepository) FindByID(ctx context.Context, id uint) (*models.Post, error) {
+	var post models.Post
+	err := r.db.WithContext(ctx).
+		Preload("User"). // Preload User
+		First(&post, id).Error
+	return &post, err
 }

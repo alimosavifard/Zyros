@@ -2,32 +2,32 @@ import axios from 'axios';
 import Cookies from 'js-cookie';
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL,
-  withCredentials: true,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+    baseURL: import.meta.env.VITE_API_URL,
+    withCredentials: true,
+    headers: {
+        'Content-Type': 'application/json',
+    },
 });
 
 api.interceptors.request.use(config => {
-  const token = Cookies.get('token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  // No need to manually add X-CSRF-Token here. The browser handles it automatically for HTTP-only cookies.
-  return config;
+    const token = Cookies.get('token');
+    if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
 });
 
 api.interceptors.response.use(
-  response => response,
-  error => {
-    if (error.response?.status === 401) {
-      Cookies.remove('token');
-      // The browser will automatically remove the HTTP-only CSRF cookie upon session expiration or server-side invalidation.
-      window.location.href = '/login';
+    response => response,
+    error => {
+        if (error.response?.status === 401) {
+            Cookies.remove('token');
+            window.location.href = '/login';
+        }
+        // اطمینان از اینکه error.message همیشه رشته است
+        const errorMessage = error.response?.data?.error || error.message || 'Unknown error';
+        return Promise.reject({ ...error, message: errorMessage });
     }
-    return Promise.reject(error);
-  }
 );
 
 export const loginUser = async (credentials) => {
@@ -44,15 +44,14 @@ export const registerUser = async (credentials) => {
 };
 
 export const getPosts = async ({ queryKey }) => {
-  const [, lang, type, page = 1, limit = 10] = queryKey;
-  const { data } = await api.get(`/posts?lang=${lang}&type=${type}&page=${page}&limit=${limit}`);
-  return data;
+    const [, lang, type, page = 1, limit = 10] = queryKey;
+    const { data } = await api.get(`/posts?lang=${lang}&type=${type}&page=${page}&limit=${limit}`);
+    return data.data; // { posts: [...] }
 };
 
-// تابع جدید برای واکشی یک پست با شناسه
 export const getPostById = async (id) => {
-  const { data } = await api.get(`/posts/${id}`);
-  return data.data; // توجه: پاسخ بک‌اند را در بخش data قرار داده‌ایم
+    const { data } = await api.get(`/posts/${id}`);
+    return data.data; // PostResponse
 };
 
 export const createPost = async (post) => {
